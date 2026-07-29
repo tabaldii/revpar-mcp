@@ -45,6 +45,20 @@ O agente interpreta a solicitação e coordena as ferramentas MCP para:
 - Recurso MCP estático com política de precificação.
 - Testes automatizados para as ferramentas MCP e o adaptador OpenAI.
 
+## Interface
+
+### Dashboard de Revenue Management
+
+Dashboard desenvolvido para acompanhar ADR sugerida, RevPAR, ocupação, estadia mínima e comparação entre tarifas de mercado.
+
+![Dashboard do RevPar MCP](docs/screenshots/dashboard.png)
+
+### Interações com o agente
+
+O agente interpreta perguntas em linguagem natural, consulta as ferramentas MCP e apresenta recomendações de precificação contextualizadas.
+
+![Interações com o RevPar Intel Agent](docs/screenshots/questions.png)
+
 ## Arquitetura
 
 ```text
