@@ -14,7 +14,6 @@ O sistema combina inteligência de mercado, eventos locais e regras determiníst
 - [Ferramentas MCP](#ferramentas-mcp)
 - [Testes](#testes)
 - [Estrutura do projeto](#estrutura-do-projeto)
-- [Licença](#licença)
 
 ## Visão geral
 
@@ -146,7 +145,3 @@ tests/
 ├── adapter.test.ts         # Contrato MCP/OpenAI
 └── tools.test.ts           # Regras das ferramentas de negócio
 ```
-
-## Licença
-
-O projeto declara licença MIT no `package.json`. Antes da publicação, confirme se a licença atende aos requisitos legais e de propriedade intelectual da organização.
