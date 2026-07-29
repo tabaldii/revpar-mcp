@@ -22,14 +22,17 @@ export function registerTools(server: McpServer): void {
    */
   server.tool(
     "get_market_intelligence",
-    "Consulta métricas detalhadas de mercado (Airbnb e Hotéis) considerando cidade, bairro, mês e tipologia do imóvel.",
+    "Consulta métricas detalhadas de mercado (Airbnb e Hotéis) considerando cidade, bairro, mês e tipologia do imóvel. Quando o bairro não for informado, utiliza Centro. Quando o imóvel for descrito como simples, padrão ou comum, utiliza a tipologia 1br.",
     {
       city: z.string().describe("Nome da cidade"),
-      neighborhood: z.string().describe("Bairro ou micro-região"),
+      neighborhood: z
+        .string()
+        .default("centro")
+        .describe("Bairro ou micro-região. Use centro quando não informado."),
       propertyType: z
         .enum(["studio", "1br", "2br", "luxury"])
         .default("1br")
-        .describe("Tipologia do imóvel"),
+        .describe("Tipologia do imóvel. Para imóvel simples, padrão ou comum, use 1br."),
       month: z
         .string()
         .regex(/^(0?[1-9]|1[0-2])$/)

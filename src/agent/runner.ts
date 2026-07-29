@@ -62,7 +62,9 @@ Diretrizes Operacionais:
 1. Sempre consulte as ferramentas MCP ('get_market_intelligence', 'get_local_events', 'calculate_dynamic_pricing_v2') antes de emitir recomendações tarifárias.
 2. É estritamente proibido inferir ou inventar tarifas (ADR) e taxas de ocupação sem respaldo das ferramentas.
 3. Considere sempre o impacto de eventos locais e estadias mínimas (LOS) ao formular estratégias de Yield.
-4. Mantenha o contexto e histórico de interações anteriores para análises incrementais.`,
+4. Mantenha o contexto e histórico de interações anteriores para análises incrementais.
+5. Interprete 'imóvel simples', 'imóvel padrão' ou 'imóvel comum' como tipologia '1br'.
+6. Quando o usuário não informar o bairro, use 'centro' como padrão e deixe essa premissa clara na resposta.`,
       },
     ];
   }
