@@ -4,6 +4,22 @@ import { logStructured } from "./observability";
 
 export const TOOL_TIMEOUT_MS = 10_000;
 export const MAX_TOOL_ATTEMPTS = 2;
+export const CIRCUIT_FAILURE_THRESHOLD = 3;
+export const CIRCUIT_COOLDOWN_MS = 30_000;
+
+interface CircuitState {
+  consecutiveFailures: number;
+  openedAt?: number;
+}
+
+const globalForCircuit = globalThis as typeof globalThis & {
+  revparCircuitStates?: Map<string, CircuitState>;
+};
+
+const circuitStates =
+  globalForCircuit.revparCircuitStates ?? new Map<string, CircuitState>();
+
+globalForCircuit.revparCircuitStates = circuitStates;
 
 export interface ToolExecutionTrace {
   toolName: string;
@@ -35,6 +51,19 @@ export async function executeToolCall({
   resultContent: string;
   trace: ToolExecutionTrace;
 }> {
+  const circuitError = getCircuitError(toolName);
+  if (circuitError) {
+    return createErrorResult({
+      toolName,
+      callId,
+      requestId,
+      sessionId,
+      error: circuitError,
+      status: "error",
+      attempts: 0,
+    });
+  }
+
   let toolArguments: Record<string, unknown>;
 
   try {
@@ -87,6 +116,8 @@ export async function executeToolCall({
         attempts: attempt,
       };
 
+      recordCircuitSuccess(toolName);
+
       logStructured({
         event: "agent.tool.completed",
         requestId,
@@ -123,6 +154,8 @@ export async function executeToolCall({
     }
   }
 
+  recordCircuitFailure(toolName);
+
   return createErrorResult({
     toolName,
     callId,
@@ -134,6 +167,40 @@ export async function executeToolCall({
     status: lastError?.code === "TOOL_TIMEOUT" ? "timeout" : "error",
     attempts: MAX_TOOL_ATTEMPTS,
   });
+}
+
+export function resetCircuitBreakersForTests(): void {
+  circuitStates.clear();
+}
+
+function getCircuitError(toolName: string): AgentError | undefined {
+  const state = circuitStates.get(toolName);
+  if (!state?.openedAt) return undefined;
+
+  if (Date.now() - state.openedAt >= CIRCUIT_COOLDOWN_MS) {
+    circuitStates.delete(toolName);
+    return undefined;
+  }
+
+  return new AgentError(
+    "TOOL_CIRCUIT_OPEN",
+    "A ferramenta está temporariamente indisponível após falhas consecutivas."
+  );
+}
+
+function recordCircuitSuccess(toolName: string): void {
+  circuitStates.delete(toolName);
+}
+
+function recordCircuitFailure(toolName: string): void {
+  const state = circuitStates.get(toolName) ?? { consecutiveFailures: 0 };
+  state.consecutiveFailures += 1;
+
+  if (state.consecutiveFailures >= CIRCUIT_FAILURE_THRESHOLD) {
+    state.openedAt = Date.now();
+  }
+
+  circuitStates.set(toolName, state);
 }
 
 function extractTextContent(content: unknown): string {

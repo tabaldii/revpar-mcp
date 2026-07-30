@@ -1,12 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { executeToolCall } from "../src/agent/toolExecutor";
+import {
+  executeToolCall,
+  resetCircuitBreakersForTests,
+} from "../src/agent/toolExecutor";
 
 function createClient(callTool: ReturnType<typeof vi.fn>): Client {
   return { callTool } as unknown as Client;
 }
 
 describe("MCP tool executor", () => {
+  beforeEach(() => {
+    resetCircuitBreakersForTests();
+  });
+
   it("deve executar uma ferramenta e registrar sucesso", async () => {
     const callTool = vi.fn().mockResolvedValue({
       content: [{ type: "text", text: '{"ok":true}' }],
@@ -61,5 +68,35 @@ describe("MCP tool executor", () => {
     expect(result.trace.errorCode).toBe("TOOL_RESPONSE_ERROR");
     expect(result.trace.attempts).toBe(2);
     expect(callTool).toHaveBeenCalledTimes(2);
+  });
+
+  it("deve abrir o circuito após falhas consecutivas", async () => {
+    const callTool = vi.fn().mockResolvedValue({
+      content: [{ type: "text", text: "falha" }],
+      isError: true,
+    });
+    const client = createClient(callTool);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await executeToolCall({
+        mcpClient: client,
+        toolName: "calculate_dynamic_pricing_v2",
+        callId: `call_${attempt}`,
+        argumentsJson: "{}",
+        requestId: "req_circuit",
+      });
+    }
+
+    const blocked = await executeToolCall({
+      mcpClient: client,
+      toolName: "calculate_dynamic_pricing_v2",
+      callId: "call_blocked",
+      argumentsJson: "{}",
+      requestId: "req_circuit",
+    });
+
+    expect(blocked.trace.errorCode).toBe("TOOL_CIRCUIT_OPEN");
+    expect(blocked.trace.attempts).toBe(0);
+    expect(callTool).toHaveBeenCalledTimes(6);
   });
 });

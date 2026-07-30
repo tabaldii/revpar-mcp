@@ -3,7 +3,8 @@ export type AgentErrorCode =
   | "TOOL_TIMEOUT"
   | "TOOL_FAILURE"
   | "TOOL_RESPONSE_ERROR"
-  | "TOOL_RETRY_EXHAUSTED";
+  | "TOOL_RETRY_EXHAUSTED"
+  | "TOOL_CIRCUIT_OPEN";
 
 export class AgentError extends Error {
   constructor(
