@@ -5,16 +5,19 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { PropertyType } from "@/mcp/mockData";
 import {
-  getAdvancedMarketData,
-  getEventsByCityAndMonth,
-  PropertyType,
-} from "@/mcp/mockData";
+  createMarketDataRepository,
+  MarketDataRepository,
+} from "@/mcp/repository";
 
 /**
  * Registra todas as ferramentas de precificação e dados no servidor MCP fornecido.
  */
-export function registerTools(server: McpServer): void {
+export function registerTools(
+  server: McpServer,
+  repository: MarketDataRepository = createMarketDataRepository()
+): void {
 
   /**
    * Ferramenta de Inteligência de Mercado
@@ -51,7 +54,7 @@ export function registerTools(server: McpServer): void {
         assumptions.push("Tipologia 1br utilizada para representar um imóvel simples.");
       }
 
-      const data = getAdvancedMarketData(
+      const data = repository.getAdvancedMarketData(
         city,
         resolvedNeighborhood,
         resolvedPropertyType as PropertyType,
@@ -95,7 +98,7 @@ export function registerTools(server: McpServer): void {
       month: z.string().regex(/^(0?[1-9]|1[0-2])$/).describe("Mês numérico ('01' a '12')"),
     },
     async ({ city, month }) => {
-      const events = getEventsByCityAndMonth(city, month);
+      const events = repository.getEventsByCityAndMonth(city, month);
 
       return {
         content: [

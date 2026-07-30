@@ -1,12 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { registerTools } from "./tools";
+import { createMarketDataRepository, MarketDataRepository } from "./repository";
 
 /**
  * Registra a superfície MCP completa do projeto: tools, resources e prompts.
  */
-export function configureMcpServer(server: McpServer): void {
-  registerTools(server);
+export function configureMcpServer(
+  server: McpServer,
+  repository: MarketDataRepository = createMarketDataRepository()
+): void {
+  registerTools(server, repository);
 
   server.resource(
     "pricing-policy",
