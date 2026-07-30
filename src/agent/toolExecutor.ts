@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { AgentError, toSafeErrorMessage } from "./errors";
 import { logStructured } from "./observability";
+import { McpToolNameSchema } from "@/mcp/contracts";
 
 export const TOOL_TIMEOUT_MS = 10_000;
 export const MAX_TOOL_ATTEMPTS = 2;
@@ -51,6 +52,18 @@ export async function executeToolCall({
   resultContent: string;
   trace: ToolExecutionTrace;
 }> {
+  if (!McpToolNameSchema.safeParse(toolName).success) {
+    return createErrorResult({
+      toolName,
+      callId,
+      requestId,
+      sessionId,
+      error: new AgentError("UNKNOWN_TOOL", "A ferramenta solicitada não é permitida."),
+      status: "error",
+      attempts: 0,
+    });
+  }
+
   const circuitError = getCircuitError(toolName);
   if (circuitError) {
     return createErrorResult({

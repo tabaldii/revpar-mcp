@@ -4,7 +4,8 @@ export type AgentErrorCode =
   | "TOOL_FAILURE"
   | "TOOL_RESPONSE_ERROR"
   | "TOOL_RETRY_EXHAUSTED"
-  | "TOOL_CIRCUIT_OPEN";
+  | "TOOL_CIRCUIT_OPEN"
+  | "UNKNOWN_TOOL";
 
 export class AgentError extends Error {
   constructor(

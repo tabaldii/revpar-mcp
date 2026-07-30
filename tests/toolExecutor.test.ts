@@ -50,6 +50,21 @@ describe("MCP tool executor", () => {
     expect(callTool).not.toHaveBeenCalled();
   });
 
+  it("deve bloquear ferramentas fora do contrato MCP", async () => {
+    const callTool = vi.fn();
+
+    const result = await executeToolCall({
+      mcpClient: createClient(callTool),
+      toolName: "unknown_tool",
+      callId: "call_unknown",
+      argumentsJson: "{}",
+      requestId: "req_unknown",
+    });
+
+    expect(result.trace.errorCode).toBe("UNKNOWN_TOOL");
+    expect(callTool).not.toHaveBeenCalled();
+  });
+
   it("deve tentar novamente quando uma ferramenta retorna erro", async () => {
     const callTool = vi.fn().mockResolvedValue({
       content: [{ type: "text", text: "falha" }],

@@ -7,7 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import OpenAI from "openai";
-import { registerTools } from "@/mcp/tools";
+import { configureMcpServer } from "@/mcp/server";
 
 /**
  * Inicializa o servidor MCP em memória e conecta o cliente MCP via transporte interno.
@@ -18,7 +18,7 @@ export async function setupMcpClient(): Promise<Client> {
     version: "2.0.0",
   });
 
-  registerTools(server);
+  configureMcpServer(server);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
