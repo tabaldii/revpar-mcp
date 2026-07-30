@@ -9,6 +9,7 @@ import {
   SESSION_TTL_MS,
 } from "@/lib/security";
 import { createRequestContext, createRequestId } from "@/agent/requestContext";
+import { getRecommendationHistoryRepository } from "@/agent/historyRepository";
 
 export async function POST(req: Request) {
   const requestId = createRequestId(req.headers.get("x-request-id"));
@@ -53,6 +54,15 @@ export async function POST(req: Request) {
       message,
       createRequestContext(requestId, sessionId)
     );
+
+    getRecommendationHistoryRepository().save({
+      sessionId,
+      requestId,
+      prompt: message,
+      response: agentResponse.content,
+      metrics: agentResponse.updatedMetrics,
+      executedTools: agentResponse.executedTools,
+    });
 
     const response = NextResponse.json({
       response: agentResponse.content,
