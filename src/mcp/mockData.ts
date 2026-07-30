@@ -3,7 +3,8 @@
  * Fornece métricas de ADR (Average Daily Rate), ocupação e eventos locais para precificação dinâmica.
  */
 
-export type PropertyType = "studio" | "1br" | "2br" | "luxury";
+import type { PropertyType } from "@/domain/entities";
+export type { PropertyType } from "@/domain/entities";
 
 /**
  * Métricas históricas e consolidadas de mercado por bairro/região.

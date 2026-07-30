@@ -1,125 +1,170 @@
 # RevPar MCP
 
-Agente de Revenue Management para hotelaria e aluguel por temporada, com integração entre OpenAI, Model Context Protocol (MCP) e uma interface web em Next.js.
+[![CI](https://github.com/tabaldii/revpar-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/tabaldii/revpar-mcp/actions/workflows/ci.yml)
 
-O sistema combina inteligência de mercado, eventos locais e regras determinísticas de precificação para produzir recomendações de ADR, ocupação, RevPAR e estadia mínima (LOS).
+Agente de Revenue Management para hotelaria e aluguel por temporada, desenvolvido para demonstrar a integração entre LLMs, Model Context Protocol (MCP), APIs e regras determinísticas de negócio.
 
-> Status: MVP técnico pronto para demonstração e evolução. Os dados de mercado e eventos atualmente são mocks locais; não representam dados de produção.
+O sistema recebe perguntas em linguagem natural e combina dados de mercado, eventos locais e estratégias de precificação para produzir recomendações de ADR, ocupação, RevPAR e estadia mínima.
+
+> **Status:** MVP técnico para estudo e portfólio. Os dados de mercado e eventos são mocks locais e não representam informações de produção ou recomendações comerciais reais.
 
 ## Demonstração
 
 [Acessar demonstração online](https://revpar-mcp.vercel.app/)
 
-## Sumário
+## Objetivo do projeto
 
-- [Visão geral](#visão-geral)
-- [Principais recursos](#principais-recursos)
-- [Arquitetura](#arquitetura)
-- [Ferramentas MCP](#ferramentas-mcp)
-- [Testes](#testes)
-- [Estrutura do projeto](#estrutura-do-projeto)
+O RevPar MCP foi criado como um laboratório prático para estudar e demonstrar:
+
+- construção de agentes com uso de ferramentas;
+- integração entre OpenAI e MCP;
+- engenharia de prompt e controle de alucinações;
+- validação de respostas geradas por LLM;
+- modelagem de domínio com TypeScript e Zod;
+- tratamento de falhas em integrações externas;
+- observabilidade, testes automatizados e CI.
+
+O projeto não foi desenhado para atender clientes reais, operar reservas ou substituir uma plataforma profissional de Revenue Management.
 
 ## Visão geral
 
-O RevPar MCP recebe uma pergunta em linguagem natural, como:
+Exemplo de consulta:
 
-> Qual a diária recomendada para um imóvel de 1 quarto no Centro de Chapecó em fevereiro?
+> Qual a diária recomendada para um imóvel simples em Chapecó no mês de dezembro?
 
-O agente interpreta a solicitação e coordena as ferramentas MCP para:
+O agente coordena as seguintes etapas:
 
-1. Consultar métricas de mercado por cidade, bairro, mês e tipologia.
-2. Identificar eventos locais e seu impacto na demanda.
-3. Calcular a tarifa dinâmica, o RevPAR estimado e a estadia mínima recomendada.
-4. Retornar uma resposta textual acompanhada de métricas estruturadas para o dashboard.
+1. interpreta a solicitação e identifica cidade, período e tipologia;
+2. consulta métricas de mercado por meio de uma ferramenta MCP;
+3. busca eventos locais e possíveis impactos na demanda;
+4. executa o cálculo determinístico de precificação;
+5. valida as métricas e as premissas antes de responder;
+6. entrega uma resposta textual e indicadores estruturados para o dashboard.
 
-## Principais recursos
+## Principais capacidades
 
-- Dashboard web responsivo para consulta e visualização de indicadores.
-- Agente conversacional usando a API Chat Completions da OpenAI.
-- Ferramentas MCP com schemas validados por Zod.
-- Precificação determinística com:
-  - ponderação de ADR Airbnb e hotel;
-  - multiplicador de demanda por evento;
-  - estratégia de lead time;
-  - ajuste por ocupação-alvo;
-  - piso operacional de R$ 150 por noite;
-  - cálculo de RevPAR;
-  - recomendação de LOS.
-- Normalização de cidade e bairro, incluindo acentos e variações de caixa.
-- Recurso MCP estático com política de precificação.
-- Testes automatizados para as ferramentas MCP e o adaptador OpenAI.
-- Histórico de conversa isolado por sessão via cookie HTTP-only.
-- Rate limiting e limite de tamanho para requisições do agente.
+### Agente e MCP
+
+- Agente conversacional integrado à API da OpenAI.
+- Function calling para selecionar e executar ferramentas MCP.
+- Servidor MCP executado em memória por transporte interno.
+- Tools com schemas de entrada validados por Zod.
+- Resources MCP para políticas de precificação, ocupação e glossário de Revenue Management.
+- Prompts MCP parametrizados para análises de alta temporada e explicação de decisões tarifárias.
+
+### Motor de precificação
+
+O cálculo é determinístico e considera:
+
+- ponderação entre ADR de aluguel por temporada e hotelaria;
+- multiplicador de demanda por eventos;
+- estratégia de lead time;
+- ajuste conforme ocupação-alvo;
+- piso operacional de R$ 150 por noite;
+- cálculo de RevPAR;
+- recomendação de estadia mínima (LOS).
+
+Os dados mockados possuem normalização de cidade e bairro, incluindo acentos, caixa alta e variações de entrada.
+
+### Confiabilidade e controle do agente
+
+- Validação das métricas antes da resposta final.
+- Bloqueio de recomendações quando os dados são insuficientes ou inválidos.
+- Registro das fontes, premissas, nível de confiança e erros de validação.
+- Limite de rodadas de execução de ferramentas.
+- Timeout para chamadas MCP.
+- Retry controlado para falhas transitórias.
+- Circuit breaker para interromper temporariamente ferramentas com falhas consecutivas.
+
+### Segurança e operação da demonstração
+
+- Histórico conversacional isolado por sessão.
+- Cookie de sessão HTTP-only.
+- Rate limiting em memória.
+- Limite de tamanho das mensagens recebidas.
+- Respostas sem exposição de detalhes internos de exceções.
+- `requestId` para rastrear cada requisição.
+- Logs estruturados e trace individual das ferramentas executadas.
+
+Esses controles são adequados ao objetivo demonstrativo do MVP. Rate limiting, sessões e histórico ainda dependem da memória da instância em execução.
+
+### Modelagem de domínio
+
+As entidades principais estão centralizadas em `src/domain/entities.ts` e possuem tipos TypeScript e schemas Zod:
+
+- `Property`;
+- `Neighborhood`;
+- `MarketMetric`;
+- `LocalEvent`;
+- `PricingRequest`;
+- `PricingRecommendation`;
+- `ToolExecution`.
+
+Essa camada cria contratos explícitos para os conceitos do negócio e reduz o risco de cada parte da aplicação interpretar os mesmos dados de maneira diferente.
 
 ## Interface
 
 ### Dashboard de Revenue Management
 
-Dashboard desenvolvido para acompanhar ADR sugerida, RevPAR, ocupação, estadia mínima e comparação entre tarifas de mercado.
+Interface para acompanhar ADR sugerida, RevPAR, ocupação, estadia mínima e comparação entre tarifas de mercado.
 
 ![Dashboard do RevPar MCP](docs/screenshots/dashboard.png)
 
 ### Interações com o agente
 
-O agente interpreta perguntas em linguagem natural, consulta as ferramentas MCP e apresenta recomendações de precificação contextualizadas.
+O agente interpreta perguntas em linguagem natural, consulta as ferramentas MCP e apresenta recomendações contextualizadas.
 
-![Interações com o RevPar Intel Agent](docs/screenshots/questions.png)
+![Interações com o RevPar MCP](docs/screenshots/questions.png)
 
 ## Arquitetura
 
 ```text
 Usuário
-  │
-  ▼
-Next.js Dashboard (src/app/page.tsx)
-  │  POST /api/chat
-  ▼
-RevParAgent (OpenAI Function Calling)
-  │
-  ▼
-OpenAI Adapter
-  │
-  ▼
-MCP Client ⇄ MCP Server em memória
-                    ├── get_market_intelligence
-                    ├── get_local_events
-                    ├── calculate_dynamic_pricing_v2
-                    └── revpar://policies/pricing
+  |
+  v
+Dashboard Next.js
+  |
+  | POST /api/chat
+  v
+RevParAgent
+  |
+  +--> OpenAI Adapter
+  |       |
+  |       v
+  |    MCP Client <----> MCP Server em memória
+  |                         |
+  |                         +--> get_market_intelligence
+  |                         +--> get_local_events
+  |                         +--> calculate_dynamic_pricing_v2
+  |                         +--> Resources e Prompts
+  |
+  +--> Validação de domínio
+  +--> Observabilidade e Tool Trace
+  +--> Histórico em memória por sessão
 ```
 
-O servidor MCP é executado em memória pelo adaptador. Isso simplifica o MVP e elimina a necessidade de um processo MCP separado, mas permite substituir posteriormente o transporte por uma implementação persistente ou remota.
-
-## Stack
-
-- Next.js 16
-- React 19
-- TypeScript 5
-- OpenAI SDK
-- Model Context Protocol SDK
-- Zod
-- Tailwind CSS
-- Vitest
+A separação entre agente, servidor MCP, ferramentas, domínio e validação permite evoluir cada responsabilidade de forma independente. O transporte em memória foi escolhido para manter o MVP simples e autocontido.
 
 ## Ferramentas MCP
 
 ### `get_market_intelligence`
 
-Consulta métricas por localização, tipologia e mês.
+Consulta métricas de mercado por localização, tipologia e mês.
 
 Parâmetros principais:
 
-- `city`: cidade.
-- `neighborhood`: bairro ou região.
-- `propertyType`: `studio`, `1br`, `2br` ou `luxury`.
+- `city`: cidade;
+- `neighborhood`: bairro ou região;
+- `propertyType`: `studio`, `1br`, `2br` ou `luxury`;
 - `month`: mês numérico de `01` a `12`.
 
 ### `get_local_events`
 
-Busca eventos de alto impacto por cidade e mês, incluindo multiplicador de demanda e LOS recomendado.
+Busca eventos de impacto por cidade e mês, incluindo multiplicador de demanda e estadia mínima recomendada.
 
 ### `calculate_dynamic_pricing_v2`
 
-Calcula a recomendação de preço com base em:
+Calcula a recomendação tarifária considerando:
 
 - `baseAirbnbAdr`;
 - `baseHotelAdr`;
@@ -130,38 +175,67 @@ Calcula a recomendação de preço com base em:
 
 O retorno inclui `suggestedAdr`, `estimatedRevPar` e `suggestedMinStayDays`.
 
-## Testes
+## Testes e qualidade
 
-Os testes foram pensados para validar as partes mais importantes do domínio, sem depender de uma chamada real à API da OpenAI.
+Os testes priorizam as regras determinísticas e os contratos de integração, sem depender de chamadas reais à API da OpenAI.
 
-- `tests/tools.test.ts` verifica as regras de negócio do motor de Revenue Management: diferenciação por tipologia e localização, identificação de eventos, impacto da demanda, estratégia de lead time, RevPAR e estadia mínima.
-- `tests/adapter.test.ts` verifica o contrato de integração entre o servidor MCP e o formato de ferramentas esperado pela OpenAI.
+São cobertos, entre outros pontos:
 
-Essa separação torna os testes rápidos e previsíveis: a camada determinística de cálculo pode evoluir com segurança, enquanto a integração com o modelo permanece isolada.
+- cálculo de precificação, RevPAR e estadia mínima;
+- diferenciação por cidade, bairro e tipologia;
+- identificação de eventos e impacto na demanda;
+- contrato entre servidor MCP e adaptador OpenAI;
+- validação das métricas e respostas do agente;
+- rate limiting e isolamento de sessão;
+- timeout, retry e circuit breaker;
+- histórico separado por sessão e expiração por TTL;
+- schemas das entidades de domínio;
+- validação do endpoint HTTP.
 
-A suíte é executada com Vitest:
+Comandos principais:
 
 ```bash
 npm test
+npm run typecheck
+npm run build
 ```
+
+O workflow de CI executa esses comandos automaticamente em pushes e pull requests.
+
+## Stack
+
+- Next.js 16;
+- React 19;
+- TypeScript 5;
+- OpenAI SDK;
+- Model Context Protocol SDK;
+- Zod;
+- Tailwind CSS;
+- Vitest.
 
 ## Estrutura do projeto
 
 ```text
 src/
+├── domain/
+│   └── entities.ts          # Entidades e schemas do domínio
 ├── agent/
-│   ├── openaiAdapter.ts   # Ponte MCP → ferramentas OpenAI
-│   └── runner.ts          # Orquestração conversacional e métricas
+│   ├── historyRepository.ts # Histórico de recomendações por sessão
+│   ├── openaiAdapter.ts     # Integração MCP com ferramentas OpenAI
+│   ├── recommendationValidator.ts
+│   ├── runner.ts            # Orquestração conversacional
+│   └── toolExecutor.ts      # Timeout, retry, circuit breaker e trace
 ├── app/
-│   ├── api/chat/route.ts   # Endpoint HTTP do agente
-│   ├── globals.css         # Estilos globais
-│   ├── layout.tsx          # Layout raiz
-│   └── page.tsx            # Dashboard
+│   ├── api/chat/route.ts    # Endpoint HTTP do agente
+│   ├── page.tsx             # Dashboard
+│   └── globals.css          # Estilos globais
 ├── mcp/
-│   ├── mockData.ts         # Dados locais de mercado e eventos
-│   ├── server.ts           # Servidor MCP e resource de política
-│   └── tools.ts            # Tools MCP e regras de pricing
-tests/
-├── adapter.test.ts         # Contrato MCP/OpenAI
-└── tools.test.ts           # Regras das ferramentas de negócio
+│   ├── mockData.ts          # Dados locais de mercado e eventos
+│   ├── repository.ts        # Contrato de acesso aos dados
+│   ├── server.ts            # Tools, resources e prompts MCP
+│   └── tools.ts             # Regras de negócio expostas ao agente
+├── lib/
+│   └── security.ts          # Sessão e rate limiting
+tests/                       # Testes unitários e de integração
+.github/workflows/ci.yml    # Pipeline de qualidade
 ```
