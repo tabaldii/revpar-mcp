@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { getOpenAIToolsFromMCP } from "./openaiAdapter";
+import {
+  RecommendationResponseSchema,
+  validateMarketMetrics,
+} from "./recommendationValidator";
 
 export interface MarketMetrics {
   city?: string;
@@ -18,7 +22,13 @@ export interface AgentRunResult {
   content: string;
   executedTools: string[];
   updatedMetrics?: MarketMetrics;
+  sources: string[];
+  assumptions: string[];
+  confidence: "high" | "medium" | "low";
+  validationErrors: string[];
 }
+
+const MAX_TOOL_ROUNDS = 5;
 
 /**
  * Função auxiliar para buscar valores no JSON de forma flexível,
@@ -75,7 +85,9 @@ Diretrizes Operacionais:
   async run(userPrompt: string): Promise<AgentRunResult> {
     const tools = await getOpenAIToolsFromMCP(this.mcpClient);
     const usedToolNames: string[] = [];
+    const assumptions = new Set<string>();
     let latestCalculatedMetrics: MarketMetrics | undefined = undefined;
+    let toolRounds = 0;
 
     this.history.push({
       role: "user",
@@ -93,6 +105,11 @@ Diretrizes Operacionais:
 
     // Resolução recursiva de chamadas de ferramentas MCP
     while (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+      toolRounds += 1;
+      if (toolRounds > MAX_TOOL_ROUNDS) {
+        break;
+      }
+
       this.history.push(responseMessage);
 
       for (const toolCall of responseMessage.tool_calls) {
@@ -124,6 +141,14 @@ Diretrizes Operacionais:
         try {
           const parsedData = JSON.parse(resultContent);
           if (parsedData && typeof parsedData === "object") {
+            if (Array.isArray(parsedData.assumptions)) {
+              for (const assumption of parsedData.assumptions) {
+                if (typeof assumption === "string") {
+                  assumptions.add(assumption);
+                }
+              }
+            }
+
             const current: MarketMetrics = latestCalculatedMetrics || {};
 
             // Extração flexível de campos com múltiplos alias
@@ -208,7 +233,32 @@ Diretrizes Operacionais:
       responseMessage = response.choices[0].message;
     }
 
-    const finalAnswer = responseMessage.content || "Não foi possível gerar uma resposta válida.";
+    const validation = validateMarketMetrics(latestCalculatedMetrics);
+    const validationErrors = [...validation.errors];
+    const hasToolLoopLimitError = toolRounds > MAX_TOOL_ROUNDS;
+
+    if (hasToolLoopLimitError) {
+      validationErrors.push("O limite de chamadas de ferramentas foi atingido.");
+    }
+
+    const finalAnswer = validation.isValid && !hasToolLoopLimitError
+      ? responseMessage.content || "Não foi possível gerar uma resposta válida."
+      : "Não foi possível gerar uma recomendação confiável com os dados disponíveis. Consulte novamente com uma cidade, bairro e período válidos.";
+
+    const confidence = validation.isValid && !hasToolLoopLimitError
+      ? usedToolNames.length >= 3 ? "high" : "medium"
+      : "low";
+
+    const result = {
+      content: finalAnswer,
+      metrics: validation.metrics,
+      sources: usedToolNames,
+      assumptions: [...assumptions],
+      confidence,
+      validationErrors,
+    };
+
+    RecommendationResponseSchema.parse(result);
 
     this.history.push({
       role: "assistant",
@@ -218,7 +268,11 @@ Diretrizes Operacionais:
     return {
       content: finalAnswer,
       executedTools: usedToolNames,
-      updatedMetrics: latestCalculatedMetrics,
+      updatedMetrics: validation.metrics,
+      sources: usedToolNames,
+      assumptions: [...assumptions],
+      confidence,
+      validationErrors,
     };
   }
 }

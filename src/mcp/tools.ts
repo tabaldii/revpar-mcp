@@ -27,11 +27,11 @@ export function registerTools(server: McpServer): void {
       city: z.string().describe("Nome da cidade"),
       neighborhood: z
         .string()
-        .default("centro")
-        .describe("Bairro ou micro-região. Use centro quando não informado."),
+        .optional()
+        .describe("Bairro ou micro-região. Use Centro quando não informado."),
       propertyType: z
         .enum(["studio", "1br", "2br", "luxury"])
-        .default("1br")
+        .optional()
         .describe("Tipologia do imóvel. Para imóvel simples, padrão ou comum, use 1br."),
       month: z
         .string()
@@ -39,10 +39,22 @@ export function registerTools(server: McpServer): void {
         .describe("Mês numérico de consulta ('01' a '12')"),
     },
     async ({ city, neighborhood, propertyType, month }) => {
+      const resolvedNeighborhood = neighborhood?.trim() || "centro";
+      const resolvedPropertyType = propertyType || "1br";
+      const assumptions: string[] = [];
+
+      if (!neighborhood?.trim()) {
+        assumptions.push("Bairro Centro utilizado porque não foi informado.");
+      }
+
+      if (!propertyType) {
+        assumptions.push("Tipologia 1br utilizada para representar um imóvel simples.");
+      }
+
       const data = getAdvancedMarketData(
         city,
-        neighborhood,
-        propertyType as PropertyType,
+        resolvedNeighborhood,
+        resolvedPropertyType as PropertyType,
         month
       );
 
@@ -52,7 +64,8 @@ export function registerTools(server: McpServer): void {
             {
               type: "text",
               text: JSON.stringify({
-                error: `Dados de mercado indisponíveis para ${city}/${neighborhood} (${propertyType}).`,
+                error: `Dados de mercado indisponíveis para ${city}/${resolvedNeighborhood} (${resolvedPropertyType}).`,
+                assumptions,
               }),
             },
           ],
@@ -60,7 +73,12 @@ export function registerTools(server: McpServer): void {
       }
 
       return {
-        content: [{ type: "text", text: JSON.stringify(data) }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ ...data, assumptions }),
+          },
+        ],
       };
     }
   );

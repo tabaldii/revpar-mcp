@@ -49,6 +49,10 @@ export async function POST(req: Request) {
       response: agentResponse.content,
       metrics: agentResponse.updatedMetrics,
       executedTools: agentResponse.executedTools,
+      sources: agentResponse.sources,
+      assumptions: agentResponse.assumptions,
+      confidence: agentResponse.confidence,
+      validationErrors: agentResponse.validationErrors,
     });
 
     response.headers.set("Cache-Control", "no-store");
