@@ -48,6 +48,8 @@ O agente interpreta a solicitação e coordena as ferramentas MCP para:
 - Normalização de cidade e bairro, incluindo acentos e variações de caixa.
 - Recurso MCP estático com política de precificação.
 - Testes automatizados para as ferramentas MCP e o adaptador OpenAI.
+- Histórico de conversa isolado por sessão via cookie HTTP-only.
+- Rate limiting e limite de tamanho para requisições do agente.
 
 ## Interface
 
