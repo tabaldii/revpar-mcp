@@ -50,6 +50,17 @@ describe("Recommendation validation", () => {
       assumptions: ["Bairro Centro utilizado porque não foi informado."],
       confidence: "high",
       validationErrors: [],
+      requestId: "req_test",
+      durationMs: 120,
+      toolTrace: [
+        {
+          toolName: "get_market_intelligence",
+          callId: "call_test",
+          status: "success",
+          durationMs: 40,
+          attempts: 1,
+        },
+      ],
     });
 
     expect(result.success).toBe(true);

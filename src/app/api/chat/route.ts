@@ -8,8 +8,11 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_TTL_MS,
 } from "@/lib/security";
+import { createRequestContext, createRequestId } from "@/agent/requestContext";
 
 export async function POST(req: Request) {
+  const requestId = createRequestId(req.headers.get("x-request-id"));
+
   try {
     const rateLimit = checkRateLimit(getClientIdentifier(req));
     if (!rateLimit.allowed) {
@@ -17,7 +20,10 @@ export async function POST(req: Request) {
         { error: "Limite de requisições atingido. Tente novamente em instantes." },
         {
           status: 429,
-          headers: { "Retry-After": String(rateLimit.retryAfterSeconds) },
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "X-Request-Id": requestId,
+          },
         }
       );
     }
@@ -28,7 +34,7 @@ export async function POST(req: Request) {
     if (!message || typeof message !== "string") {
       return NextResponse.json(
         { error: "O campo 'message' é obrigatório e deve ser uma string." },
-        { status: 400 }
+        { status: 400, headers: { "X-Request-Id": requestId } }
       );
     }
 
@@ -37,13 +43,16 @@ export async function POST(req: Request) {
         {
           error: `A mensagem deve ter no máximo ${MAX_MESSAGE_LENGTH} caracteres.`,
         },
-        { status: 413 }
+        { status: 413, headers: { "X-Request-Id": requestId } }
       );
     }
 
     const { sessionId, isNew } = getOrCreateSessionId(req.headers.get("cookie"));
     const agent = await getAgentForSession(sessionId);
-    const agentResponse = await agent.run(message);
+    const agentResponse = await agent.run(
+      message,
+      createRequestContext(requestId, sessionId)
+    );
 
     const response = NextResponse.json({
       response: agentResponse.content,
@@ -53,10 +62,14 @@ export async function POST(req: Request) {
       assumptions: agentResponse.assumptions,
       confidence: agentResponse.confidence,
       validationErrors: agentResponse.validationErrors,
+      requestId: agentResponse.requestId,
+      durationMs: agentResponse.durationMs,
+      toolTrace: agentResponse.toolTrace,
     });
 
     response.headers.set("Cache-Control", "no-store");
     response.headers.set("X-Content-Type-Options", "nosniff");
+    response.headers.set("X-Request-Id", requestId);
 
     if (isNew) {
       response.cookies.set({
@@ -81,6 +94,7 @@ export async function POST(req: Request) {
         headers: {
           "Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
+          "X-Request-Id": requestId,
         },
       }
     );

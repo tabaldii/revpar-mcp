@@ -5,6 +5,9 @@ import {
   RecommendationResponseSchema,
   validateMarketMetrics,
 } from "./recommendationValidator";
+import { logStructured } from "./observability";
+import { createRequestContext, RequestContext } from "./requestContext";
+import { executeToolCall, ToolExecutionTrace } from "./toolExecutor";
 
 export interface MarketMetrics {
   city?: string;
@@ -26,6 +29,9 @@ export interface AgentRunResult {
   assumptions: string[];
   confidence: "high" | "medium" | "low";
   validationErrors: string[];
+  requestId: string;
+  durationMs: number;
+  toolTrace: ToolExecutionTrace[];
 }
 
 const MAX_TOOL_ROUNDS = 5;
@@ -82,12 +88,23 @@ Diretrizes Operacionais:
   /**
    * Processa uma mensagem do usuário resolvendo recursivamente as chamadas de ferramentas requeridas.
    */
-  async run(userPrompt: string): Promise<AgentRunResult> {
+  async run(
+    userPrompt: string,
+    context: RequestContext = createRequestContext()
+  ): Promise<AgentRunResult> {
     const tools = await getOpenAIToolsFromMCP(this.mcpClient);
     const usedToolNames: string[] = [];
     const assumptions = new Set<string>();
+    const toolTrace: ToolExecutionTrace[] = [];
+    const executionErrors: string[] = [];
     let latestCalculatedMetrics: MarketMetrics | undefined = undefined;
     let toolRounds = 0;
+
+    logStructured({
+      event: "agent.request.started",
+      requestId: context.requestId,
+      sessionId: context.sessionId,
+    });
 
     this.history.push({
       role: "user",
@@ -119,23 +136,26 @@ Diretrizes Operacionais:
         }
 
         const functionName = toolCall.function.name;
-        const functionArgs = JSON.parse(toolCall.function.arguments);
 
         if (!usedToolNames.includes(functionName)) {
           usedToolNames.push(functionName);
         }
 
-        const toolResult = await this.mcpClient.callTool({
-          name: functionName,
-          arguments: functionArgs,
+        const execution = await executeToolCall({
+          mcpClient: this.mcpClient,
+          toolName: functionName,
+          callId: toolCall.id,
+          argumentsJson: toolCall.function.arguments,
+          requestId: context.requestId,
+          sessionId: context.sessionId,
         });
+        toolTrace.push(execution.trace);
 
-        let resultContent = "";
-        if (Array.isArray(toolResult.content) && toolResult.content[0]?.type === "text") {
-          resultContent = toolResult.content[0].text;
-        } else {
-          resultContent = JSON.stringify(toolResult.content);
+        if (execution.trace.status !== "success" && execution.trace.error) {
+          executionErrors.push(execution.trace.error);
         }
+
+        const resultContent = execution.resultContent;
 
         // ⚡ CAPTURA E ACÚMULO ULTRA-RESILIENTE DE MÉTRICAS
         try {
@@ -234,7 +254,7 @@ Diretrizes Operacionais:
     }
 
     const validation = validateMarketMetrics(latestCalculatedMetrics);
-    const validationErrors = [...validation.errors];
+    const validationErrors = [...validation.errors, ...executionErrors];
     const hasToolLoopLimitError = toolRounds > MAX_TOOL_ROUNDS;
 
     if (hasToolLoopLimitError) {
@@ -256,9 +276,20 @@ Diretrizes Operacionais:
       assumptions: [...assumptions],
       confidence,
       validationErrors,
+      requestId: context.requestId,
+      durationMs: Date.now() - context.startedAt,
+      toolTrace,
     };
 
     RecommendationResponseSchema.parse(result);
+
+    logStructured({
+      event: "agent.request.completed",
+      requestId: context.requestId,
+      sessionId: context.sessionId,
+      status: validationErrors.length === 0 ? "success" : "completed_with_validation_errors",
+      durationMs: result.durationMs,
+    });
 
     this.history.push({
       role: "assistant",
@@ -273,6 +304,9 @@ Diretrizes Operacionais:
       assumptions: [...assumptions],
       confidence,
       validationErrors,
+      requestId: context.requestId,
+      durationMs: result.durationMs,
+      toolTrace,
     };
   }
 }

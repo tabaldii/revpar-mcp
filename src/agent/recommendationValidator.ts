@@ -1,6 +1,16 @@
 import { z } from "zod";
 import type { MarketMetrics } from "./runner";
 
+const ToolExecutionTraceSchema = z.object({
+  toolName: z.string().min(1),
+  callId: z.string().min(1),
+  status: z.enum(["success", "error", "timeout"]),
+  durationMs: z.number().finite().nonnegative(),
+  attempts: z.number().int().min(0),
+  errorCode: z.string().optional(),
+  error: z.string().optional(),
+});
+
 export const MarketMetricsSchema = z.object({
   city: z.string().min(1),
   neighborhood: z.string().min(1),
@@ -20,6 +30,9 @@ export const RecommendationResponseSchema = z.object({
   assumptions: z.array(z.string()),
   confidence: z.enum(["high", "medium", "low"]),
   validationErrors: z.array(z.string()),
+  requestId: z.string().min(1),
+  durationMs: z.number().finite().nonnegative(),
+  toolTrace: z.array(ToolExecutionTraceSchema),
 });
 
 export interface MetricsValidationResult {
