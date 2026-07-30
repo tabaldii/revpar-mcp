@@ -18,7 +18,11 @@
     "hospitality",
     "pricing"
   ],
-  "author": "",
+  "author": "Tabaldi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tabaldii/revpar-mcp.git"
+  },
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^26.1.2",

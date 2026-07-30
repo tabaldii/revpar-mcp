@@ -6,6 +6,10 @@ O sistema combina inteligência de mercado, eventos locais e regras determiníst
 
 > Status: MVP técnico pronto para demonstração e evolução. Os dados de mercado e eventos atualmente são mocks locais; não representam dados de produção.
 
+## Demonstração
+
+[Acessar demonstração online](https://revpar-mcp.vercel.app/)
+
 ## Sumário
 
 - [Visão geral](#visão-geral)
